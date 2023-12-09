@@ -1,0 +1,18 @@
+{
+  "Routes": [
+    {
+      "UpstreamHttpMethod": [ "Get" ],
+      "UpstreamPathTemplate": "/products",
+      "DownstreamPathTemplate": "/api/Products/getall",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          //"Host": "c_rest_api",
+          //"Port": 7000,
+          "Host": "localhost",
+          "Port": 7000
+        }
+      ]
+    }
+  ]
+}

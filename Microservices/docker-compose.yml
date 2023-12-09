@@ -1,0 +1,50 @@
+version: '3.1'
+
+services:
+        s_api_gateway:
+            container_name: c_api_gateway
+            image: ruveydayilmaz/apigateway
+            build:
+                context: .
+                dockerfile: APIGateway/Dockerfile
+            ports:
+                - 1000:1000
+            networks:
+                 - micro_net
+            #     - int_net
+        
+        s_rest_api:
+            container_name: c_rest_api
+            image: ruveydayilmaz/restapi
+            build:
+                context: .
+                dockerfile: Services/RestAPI/WebAPI/Dockerfile
+            ports:
+                - 7000:7000
+            networks:
+                - micro_net
+            depends_on:
+                - s_database
+            environment:
+                - DB_HOST=s_database
+                - DB_NAME=Northwind
+                - DB_SA_PASSWORD=password@12345#
+
+        s_database:
+            container_name: c_database
+            # image: mcr.microsoft.com/mssql/server:2022-latest
+            image: postgres:14.5-alpine
+            ports:
+                - 5432:5432
+            environment:
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: 1234
+                POSTGRES_DB: northwind
+            networks:
+                - micro_net
+networks:
+    int_net:
+        driver: overlay
+        internal: true
+    micro_net:
+        driver: bridge
