@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using DataAccess.Abstract;
 using DataAccess.Concrete.MongoDB.Context;
 using Entities.Concrete;
@@ -62,6 +60,16 @@ namespace DataAccess.Concrete.MongoDB.Repositories
                 .Set(u => u.UpdatedAt, DateTime.UtcNow);
 
             _userCollection.UpdateOne(filter, update);
+        }
+
+        public User UpdatePassword(User entity, string newPassword)
+        {
+            var filter = Builders<User>.Filter.Eq(u => u.Id, entity.Id);
+            var update = Builders<User>.Update.Set(u => u.Password, newPassword)
+                                              .Set(u => u.UpdatedAt, DateTime.UtcNow);
+
+            _userCollection.UpdateOne(filter, update);
+            return entity;
         }
     }
 }

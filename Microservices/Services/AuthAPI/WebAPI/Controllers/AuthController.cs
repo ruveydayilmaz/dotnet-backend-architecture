@@ -3,6 +3,7 @@ using Core.Utilities.Results;
 using Entities.Concrete;
 using Entities.DTOs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 
 namespace WebAPI.Controllers
 {
@@ -12,34 +13,41 @@ namespace WebAPI.Controllers
         private readonly IEmailService _emailService;
         private readonly IVerificationService _verificationService;
         private readonly ITokenService _tokenService;
+        private readonly IRedisService _redisService;
 
-        public AuthController(IUserService userService, IEmailService emailService, IVerificationService verificationService, ITokenService tokenService)
+        public AuthController(IUserService userService, IEmailService emailService, IVerificationService verificationService, ITokenService tokenService, IRedisService redisService)
         {
             _userService = userService;
             _emailService = emailService;
             _verificationService = verificationService;
             _tokenService = tokenService;
+            _redisService = redisService;
         }
 
         [HttpPost("send-otp-to-email")]
         public IActionResult SendOtpToEmail([FromBody] SendOtpRequestDto request)
         {
-            var existingUser = _userService.FindByEmail(request.Email);
+            var existingUser = _userService.GetByEmail(request.Email);
 
             if (existingUser != null && existingUser.Data != null && existingUser.Data.Verified.IsVerified)
             {
                 return NotFound(new { message = "AlreadyVerified" });
             }
 
-            var code = _userService.GenerateVerificationCode(request.Email);
+            Random random = new Random();
+            int verificationCode = random.Next(100000, 999999);
+
+            var result = _redisService.SaveVerificationCode(request.Email, verificationCode.ToString());
+
+
             //_emailService.SendEmail(new EmailRequest  -> i don't have smtp
             //{
             //    ToUser = request.Email,
-            //    Code = code.Data,
+            //    Code = result.Data,
             //    Type = 0
             //});
 
-            return Ok(code);
+            return Ok(result);
         }
 
         [HttpPost("verify-phone-or-email")]
@@ -57,7 +65,7 @@ namespace WebAPI.Controllers
                 filter = new FilterOptions { PhoneNumber = request.PhoneNumber };
             }
 
-            var existingUser = _userService.GetOne(filter, request.IsEmail);
+            var existingUser = _userService.GetOneByEmailOrPhoneNumber(filter, request.IsEmail);
 
             if (existingUser != null && existingUser.Data != null && existingUser.Data.Verified.IsVerified)
             {
@@ -99,7 +107,7 @@ namespace WebAPI.Controllers
                 filter = new FilterOptions { PhoneNumber = request.PhoneNumber };
             }
 
-            var existingUser = _userService.GetOne(filter, request.IsEmail);
+            var existingUser = _userService.GetOneByEmailOrPhoneNumber(filter, request.IsEmail);
 
             if (existingUser != null && existingUser.Data != null)
             {
@@ -137,7 +145,7 @@ namespace WebAPI.Controllers
             var createdUser = _userService.Add(user);
 
             var accessToken = _tokenService.CreateAccessToken(createdUser.Data.Id);
-            var refreshToken =  _tokenService.CreateRefreshToken(createdUser.Data.Id);
+            var refreshToken = _tokenService.CreateRefreshToken(createdUser.Data.Id);
 
             var responseData = new
             {
@@ -168,7 +176,7 @@ namespace WebAPI.Controllers
                 filter = new FilterOptions { PhoneNumber = request.PhoneNumber };
             }
 
-            var existingUser = _userService.GetOne(filter, request.IsEmail);
+            var existingUser = _userService.GetOneByEmailOrPhoneNumber(filter, request.IsEmail);
 
             if (existingUser.Data == null)
             {
@@ -177,7 +185,7 @@ namespace WebAPI.Controllers
 
             var isPasswordCorrect = BCrypt.Net.BCrypt.Verify(request.Password, existingUser.Data.Password);
 
-            if(!isPasswordCorrect)
+            if (!isPasswordCorrect)
             {
                 return NotFound(new { message = "Invalid Credentials" });
             }
@@ -196,6 +204,150 @@ namespace WebAPI.Controllers
             {
                 message = "Successfully Login",
                 data = responseData
+            });
+        }
+
+        [HttpPost("refresh-access-token")]
+        public IActionResult RefreshAccessToken([FromBody] RefreshAccessTokenDto request)
+        {
+
+            var userId = _tokenService.VerifyRefreshToken(request.RefreshToken);
+
+            var existingUser = _userService.GetById(userId.Data);
+
+            if (existingUser.Data == null)
+            {
+                return NotFound(new { message = "Not Registered" });
+            }
+
+            var accessToken = _tokenService.CreateAccessToken(existingUser.Data.Id);
+
+            var responseData = new
+            {
+                AccessToken = accessToken.Data
+            };
+
+            return Ok(new
+            {
+                message = "Successfully refreshed access token",
+                data = responseData
+            });
+        }
+
+        [HttpPost("logout")]
+        public IActionResult Logout([FromBody] RefreshAccessTokenDto request)
+        {
+
+            var userId = _tokenService.VerifyRefreshToken(request.RefreshToken);
+            var isDeleted = _redisService.DeleteKey($"refresh_token:{request.RefreshToken}");
+
+            var responseData = new
+            {
+                IsDeleted = isDeleted.Data,
+                UserId = userId.Data,
+            };
+
+            return Ok(new
+            {
+                message = "Successfully logged out",
+                data = responseData
+            });
+        }
+
+        [HttpPost("forgot-password")]
+        public IActionResult ForgotPassword([FromBody] ForgotPasswordDto request)
+        {
+            FilterOptions filter = null;
+
+            if (request.IsEmail)
+            {
+                filter = new FilterOptions { Email = request.Email };
+            }
+            else
+            {
+                filter = new FilterOptions { PhoneNumber = request.PhoneNumber };
+            }
+
+            var existingUser = _userService.GetOneByEmailOrPhoneNumber(filter, request.IsEmail);
+
+            if (existingUser.Data == null)
+            {
+                return NotFound(new { message = "Not Registered" });
+            }
+
+            Random random = new Random();
+            int verificationCode = random.Next(100000, 999999);
+
+            string emailOrPhone = request.IsEmail ? request.Email : request.PhoneNumber;
+            string key = $"forgot:{emailOrPhone}";
+            const int THREE_MIN = 60 * 3; // seconds
+            var result = _redisService.SetAsync(key, verificationCode.ToString(), THREE_MIN);
+
+            if (request.IsEmail)
+            {
+                //_emailService.SendEmail(new EmailRequest  -> i don't have smtp
+                //{
+                //    ToUser = request.Email,
+                //    Code = result.Data,
+                //    Type = 0
+                //});
+            }
+            else
+            {
+                // send sms
+            }
+
+            return Ok(new
+            {
+                code = verificationCode,
+                message = "Successfully sent code for forgot password"
+            });
+        }
+
+        [HttpPost("reset-password")]
+        public IActionResult ResetPassword([FromBody] ResetPasswordDto request)
+        {
+            string emailOrPhone = request.IsEmail ? request.Email : request.PhoneNumber;
+            string key = $"forgot:{emailOrPhone}";
+
+            var verificationCode = _redisService.GetAsync(key);
+
+            if(request.Code != verificationCode.Data)
+            {
+                return BadRequest(new { message = "Invalid Code" });
+            }
+
+            FilterOptions filter = null;
+
+            if (request.IsEmail)
+            {
+                filter = new FilterOptions { Email = request.Email };
+            }
+            else
+            {
+                filter = new FilterOptions { PhoneNumber = request.PhoneNumber };
+            }
+
+            var existingUser = _userService.GetOneByEmailOrPhoneNumber(filter, request.IsEmail);
+
+            if (existingUser.Data == null)
+            {
+                return NotFound(new { message = "Not Registered" });
+            }
+
+            var hashedNewPassword = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+
+            User user = new User
+            {
+                Id = existingUser.Data.Id,
+                Password = hashedNewPassword
+            };
+
+            _userService.UpdatePassword(user, hashedNewPassword);
+
+            return Ok(new
+            {
+                message = "Successfully updated password"
             });
         }
     }

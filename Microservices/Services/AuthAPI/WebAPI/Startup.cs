@@ -3,6 +3,7 @@ using Business.Concrete;
 using DataAccess.Abstract;
 using DataAccess.Concrete.MongoDB.Context;
 using DataAccess.Concrete.MongoDB.Repositories;
+using StackExchange.Redis;
 
 namespace WebAPI
 {
@@ -25,9 +26,15 @@ namespace WebAPI
                 var connectionString = Environment.GetEnvironmentVariable("ConnectionString");
                 var databaseName = Environment.GetEnvironmentVariable("DatabaseName");
 
-                Console.WriteLine($"string: {connectionString} - name: {databaseName}");
-
                 return new MongoContext(connectionString, databaseName);
+            });
+
+            services.AddSingleton<IConnectionMultiplexer>(provider =>
+            {
+                var connectionString = Environment.GetEnvironmentVariable("RedisConnectionString");
+
+                var configuration = ConfigurationOptions.Parse(connectionString);
+                return ConnectionMultiplexer.Connect(configuration);
             });
 
             services.AddDistributedMemoryCache();

@@ -12,5 +12,6 @@ namespace DataAccess.Abstract
     public interface IUserDal : IEntityRepository<User>
     {
         User GetByEmailOrPhoneNumber(Expression<Func<User, bool>> filter);
+        User UpdatePassword(User entity, string newPassword);
     }
 }

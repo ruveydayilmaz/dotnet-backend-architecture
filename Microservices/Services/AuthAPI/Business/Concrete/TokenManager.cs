@@ -17,10 +17,12 @@ namespace Business.Concrete
     public class TokenManager : ITokenService
     {
         IRedisService _redisService;
+        IUserService _userService;
 
-        public TokenManager(IRedisService redisService)
+        public TokenManager(IRedisService redisService, IUserService userService)
         {
             _redisService = redisService;
+            _userService = userService;
         }
 
         public IDataResult<string> CreateAccessToken(string id)
@@ -64,11 +66,54 @@ namespace Business.Concrete
             var token = tokenHandler.CreateToken(tokenDescriptor);
             var refreshToken = tokenHandler.WriteToken(token);
 
-            var refreshKey = $"refresh_token:{id}";
+            var refreshKey = $"refresh_token:{refreshToken}";
             const int ONE_MONTH = 24 * 60 * 60 * 30; // seconds
-            _redisService.SetAsync(refreshKey, refreshToken, ONE_MONTH);
+            _redisService.SetAsync(refreshKey, id, ONE_MONTH);
 
             return new SuccessDataResult<string>(refreshToken, "generated refresh token");
+        }
+
+        public IDataResult<string> VerifyRefreshToken(string refreshToken)
+        {
+            var userIdResult = _redisService.GetAsync($"refresh_token:{refreshToken}");
+
+            if (userIdResult.Data != null)
+            {
+                var existingUser = _userService.GetById(userIdResult.Data);
+
+                if (existingUser == null || existingUser.Data == null)
+                {
+                    return new SuccessDataResult<string>("User not found"); // ErrorDataResult
+                }
+
+                var refreshSecret = "fd6d2c6fa1c2ff8959f84c81aa0cc14345162172d3d6598347696089db6918e1";
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.ASCII.GetBytes(refreshSecret);
+
+                var tokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = false,
+                };
+
+                SecurityToken securityToken;
+                var principal = tokenHandler.ValidateToken(refreshToken, tokenValidationParameters, out securityToken);
+
+                var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null)
+                {
+                    return new SuccessDataResult<string>("User id not found in the refresh token"); // ErrorDataResult
+                }
+
+                return new SuccessDataResult<string>(existingUser.Data.Id, "Refresh token verified");
+            }
+            else
+            {
+                return new SuccessDataResult<string>("Failed to verify refresh token"); // ErrorDataResult
+            }
         }
     }
 }

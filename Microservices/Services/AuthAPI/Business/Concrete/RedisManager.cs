@@ -1,30 +1,26 @@
 ﻿using Business.Abstract;
 using Core.Utilities.Results;
-using Microsoft.Extensions.Caching.Distributed;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using StackExchange.Redis;
 
 namespace Business.Concrete
 {
     public class RedisManager : IRedisService
     {
-        private readonly IDistributedCache _cache;
+        private readonly IConnectionMultiplexer _redisConnection;
 
-        public RedisManager(IDistributedCache cache)
+        public RedisManager(IConnectionMultiplexer redisConnection)
         {
-            _cache = cache;
+            _redisConnection = redisConnection;
         }
 
         public IDataResult<string> GetAsync(string key)
         {
-            var storedCodeBytes = _cache.GetAsync(key).Result;
+            var redisDatabase = _redisConnection.GetDatabase();
+            var storedCodeBytes = redisDatabase.StringGet(key);
 
-            if (storedCodeBytes != null)
+            if (!storedCodeBytes.IsNullOrEmpty)
             {
-                var storedCode = Encoding.UTF8.GetString(storedCodeBytes);
+                var storedCode = storedCodeBytes.ToString();
 
                 return new SuccessDataResult<string>(storedCode, "stored code");
             }
@@ -36,27 +32,35 @@ namespace Business.Concrete
 
         public IDataResult<bool> SetAsync(string key, string value, int expiresInSeconds)
         {
-            var options = new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(expiresInSeconds),
-            };
+            var redisDatabase = _redisConnection.GetDatabase();
+            var success = redisDatabase.StringSet(key, value, TimeSpan.FromSeconds(expiresInSeconds));
 
-            _cache.SetStringAsync(key, value, options);
-            return new SuccessDataResult<bool>(true);
+            return new SuccessDataResult<bool>(success, "Data set in Redis.");
+        }
+
+        public IDataResult<bool> DeleteKey(string key)
+        {
+            var redisDatabase = _redisConnection.GetDatabase();
+            var result = redisDatabase.KeyDelete(key);
+
+            if (result)
+            {
+                return new SuccessDataResult<bool>(true, $"Key '{key}' deleted successfully");
+            }
+            else
+            {
+                return new SuccessDataResult<bool>(false, $"Key '{key}' not found in Redis"); // ErrorDataResult
+            }
         }
 
         public IDataResult<string> SaveVerificationCode(string email, string code)
         {
             string key = $"verification_code:{email}";
 
-            var options = new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
-            };
+            var redisDatabase = _redisConnection.GetDatabase();
+            var success = redisDatabase.StringSet(key, code, TimeSpan.FromHours(1));
 
-            _cache.SetString(key, code, options);
-
-            return new SuccessDataResult<string>(code, "Code saved to Redis.");
+            return new SuccessDataResult<string>(success ? code : null, success ? "Code saved to Redis." : "Failed to save code to Redis.");
         }
     }
 }

@@ -3,28 +3,20 @@ using Business.Constants;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Business.Concrete
 {
     public class UserManager : IUserService
     {
         IUserDal _userDal;
-        IRedisService _redisService;
 
-        public UserManager(IUserDal userDal, IRedisService redisService)
+        public UserManager(IUserDal userDal)
         {
             _userDal = userDal;
-            _redisService = redisService;
         }
 
-        public IDataResult<User> FindByEmail(string email)
+        public IDataResult<User> GetByEmail(string email)
         {
             User user = _userDal.Get(u => u.Email == email);
 
@@ -38,24 +30,21 @@ namespace Business.Concrete
             }
         }
 
-        public IDataResult<string> GenerateVerificationCode(string email)
+        public IDataResult<User> GetById(string id)
         {
-            Random random = new Random();
-            int verificationCode = random.Next(100000, 999999);
+            User user = _userDal.Get(u => u.Id == id);
 
-            var result = _redisService.SaveVerificationCode(email, verificationCode.ToString());
-
-            if (result.Success)
+            if (user != null)
             {
-                return new SuccessDataResult<string>(verificationCode.ToString(), "Verification code generated and saved to Redis.");
+                return new SuccessDataResult<User>(user, "user found");
             }
             else
             {
-                return new SuccessDataResult<string>(result.Message); // ErrorDataResult
+                return new SuccessDataResult<User>("user not found");
             }
         }
 
-        public IDataResult<User> GetOne(FilterOptions filterOptions, bool isEmail)
+        public IDataResult<User> GetOneByEmailOrPhoneNumber(FilterOptions filterOptions, bool isEmail)
         {
             Expression<Func<User, bool>> filterExpression;
 
@@ -84,6 +73,13 @@ namespace Business.Concrete
         {
             _userDal.Add(user);
             return new SuccessDataResult<User>(user, "User created successfully");
+        }
+
+        public IDataResult<User> UpdatePassword(User user, string newPassword)
+        {
+            var updatedUser = _userDal.UpdatePassword(user, newPassword);
+
+            return new SuccessDataResult<User>(updatedUser, "User updated successfully");
         }
     }
 }

@@ -12,5 +12,6 @@ namespace Business.Abstract
         IDataResult<string> GetAsync(string key);
         IDataResult<bool> SetAsync(string key, string value, int expiresInSeconds);
         IDataResult<string> SaveVerificationCode(string email, string code);
+        IDataResult<bool> DeleteKey(string email);
     }
 }

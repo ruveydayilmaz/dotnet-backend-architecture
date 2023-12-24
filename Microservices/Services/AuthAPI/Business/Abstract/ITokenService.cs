@@ -13,5 +13,6 @@ namespace Business.Abstract
     {
         IDataResult<string> CreateAccessToken(string id);
         IDataResult<string> CreateRefreshToken(string id);
+        IDataResult<string> VerifyRefreshToken(string refreshToken);
     }
 }
