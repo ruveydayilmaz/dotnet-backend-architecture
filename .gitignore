@@ -479,4 +479,5 @@ $RECYCLE.BIN/
 Microservices/Services/NotificationAPI/SocketServer/appsettings.Development.json
 Microservices/Services/NotificationAPI/WebAPI/appsettings.Development.json
 Microservices/Services/RestAPI/WebAPI/appsettings.Development.json
+Microservices/Services/AuthAPI/WebAPI/appsettings.Development.json
 Microservices/Services/NotificationAPI/SocketClient/
