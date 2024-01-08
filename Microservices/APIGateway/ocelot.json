@@ -1,16 +1,32 @@
 {
   "Routes": [
     {
-      "UpstreamHttpMethod": [ "Get" ],
-      "UpstreamPathTemplate": "/products",
-      "DownstreamPathTemplate": "/api/Products/getall",
-      "DownstreamScheme": "http",
+      "UpstreamPathTemplate": "/auth/{everything}",
+      "DownstreamPathTemplate": "/api/Auth/{everything}",
       "DownstreamHostAndPorts": [
         {
-          //"Host": "c_rest_api",
-          //"Port": 7000,
+          "Host": "localhost",
+          "Port": 7003
+        }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/products/{everything}",
+      "DownstreamPathTemplate": "/api/Products/{everything}",
+      "DownstreamHostAndPorts": [
+        {
           "Host": "localhost",
           "Port": 7000
+        }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/notifications/{everything}",
+      "DownstreamPathTemplate": "/api/Notifications/{everything}",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 7001
         }
       ]
     }

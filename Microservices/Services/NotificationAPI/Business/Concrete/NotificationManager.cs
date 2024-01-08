@@ -25,9 +25,9 @@ namespace Business.Concrete
         //    throw new NotImplementedException();
         //}
 
-        public IDataResult<List<UserNotificationPreference>> GetUserNotificationPreferences()
+        public IDataResult<List<UserNotificationPreference>> GetUserNotificationPreferences(string userId)
         {
-            return new SuccessDataResult<List<UserNotificationPreference>>(_notificationDal.GetAll(), Messages.PreferencesListed);
+            return new SuccessDataResult<List<UserNotificationPreference>>(_notificationDal.GetAll(n => n.UserId == userId), Messages.PreferencesListed);
         }
     }
 }

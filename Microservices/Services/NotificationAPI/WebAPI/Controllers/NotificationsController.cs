@@ -1,11 +1,13 @@
 ﻿using Business.Abstract;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace WebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class NotificationsController : ControllerBase
     {
         INotificationService _notificationService;
@@ -15,10 +17,12 @@ namespace WebAPI.Controllers
             _notificationService = notificationService;
         }
 
-        [HttpGet("getnotificationpreferences")]
-        public IActionResult GetUserNotificationPreferences() // WIP: add auth and update this
+        [HttpGet("notification-preferences")]
+        public IActionResult GetUserNotificationPreferences()
         {
-            var result = _notificationService.GetUserNotificationPreferences();
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            var result = _notificationService.GetUserNotificationPreferences(userId);
 
             if (result.Success)
             {

@@ -10,7 +10,7 @@ namespace Entities.DTOs
     public class UserNotificationPreferenceDetailDto : IDto
     {
         public int NotificationId { get; set; }
-        public int UserId { get; set; }
+        public string UserId { get; set; }
         public string UserType { get; set; } // "admin", "user" etc
         public string NotificationType { get; set; } // "alert", "info", "reminder" etc
         public bool IsEnabled { get; set; }

@@ -10,7 +10,7 @@ namespace Business.Abstract
 {
     public interface INotificationService
     {
-        IDataResult<List<UserNotificationPreference>> GetUserNotificationPreferences();
+        IDataResult<List<UserNotificationPreference>> GetUserNotificationPreferences(string userId);
         //IDataResult<UserNotificationPreference> AddNotificationTypeToUser(int notificationTypeId);
         //IResult Add(UserNotificationPreference userNotificationPreference);
     }
